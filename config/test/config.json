@@ -1,0 +1,16 @@
+{
+  "misp":{
+    "protocol" :"https",
+    "host" : "10.12.23.43",
+    "api-key" :"foobar",
+    "api-url" : "/foo/bar"
+  },
+  "log-search": {
+    "protocol":"https",
+    "host":"135.111.155.258:5874"
+  },
+  "notifier-email": "foo@test.com",
+  "notification-recipients": [
+    "foo@bar.com"
+  ]
+}
