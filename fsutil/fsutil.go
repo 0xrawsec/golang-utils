@@ -70,3 +70,32 @@ func AbsFromRelativeToBin(relPath ...string) (string, error) {
 	}
 	return filepath.Join(absRootDirname, filepath.Join(relPath...)), nil
 }
+
+/////////////////////////////// Common utilities ///////////////////////////////
+
+// IsFile returns true if path is a file
+func IsFile(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.Mode().IsRegular()
+}
+
+// IsDir returns true if path is a directory
+func IsDir(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
+}
+
+// IsLink returns true if path is a Symlink
+func IsLink(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return (s.Mode()&os.ModeSymlink == os.ModeSymlink)
+}
