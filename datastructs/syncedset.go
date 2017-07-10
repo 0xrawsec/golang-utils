@@ -23,6 +23,12 @@ func NewSyncedSet(sets ...*SyncedSet) (ss SyncedSet) {
 	return
 }
 
+func NewInitSyncedSet(data ...interface{}) (ss SyncedSet) {
+	ss.set = make(map[interface{}]bool)
+	ss.Add(data...)
+	return
+}
+
 // Equal returns true if both sets are equal
 func (s *SyncedSet) Equal(other *SyncedSet) bool {
 	s.RLock()
