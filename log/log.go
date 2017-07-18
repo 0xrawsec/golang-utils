@@ -15,7 +15,8 @@ const (
 	// LError log level
 	LError = 1 << 2
 	// LCritical log level
-	LCritical = 1 << 3
+	LCritical       = 1 << 3
+	defaultFileMode = 0640
 )
 
 var (
@@ -38,10 +39,18 @@ func InitLogger(logLevel int) {
 }
 
 // SetLogfile sets output file to put logging messages
-func SetLogfile(logfilePath string) {
+func SetLogfile(logfilePath string, opts ...os.FileMode) {
 	var err error
-	gLogFile, err := os.Create(logfilePath)
+	mode := os.FileMode(defaultFileMode)
+	// We open the file in append mode
+	if len(opts) > 0 {
+		mode = opts[0]
+	}
+	gLogFile, err := os.OpenFile(logfilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, mode)
 	if err != nil {
+		panic(err)
+	}
+	if _, err := gLogFile.Seek(0, os.SEEK_END); err != nil {
 		panic(err)
 	}
 	log.SetOutput(gLogFile)

@@ -77,9 +77,36 @@ func (c *Config) GetString(key string) (string, error) {
 	return val.(string), nil
 }
 
-// GetSubconfig : get a subconfig referenced by key
+func (c *Config) GetInt64(key string) (int64, error) {
+	val, ok := (*c)[key]
+	if !ok {
+		return 0, ErrNoSuchKey
+	}
+	return int64(val.(float64)), nil
+}
+
+func (c *Config) GetUint64(key string) (uint64, error) {
+	val, ok := (*c)[key]
+	if !ok {
+		return 0, ErrNoSuchKey
+	}
+	return uint64(val.(float64)), nil
+}
+
+// GetSubConfig : get a subconfig referenced by key
+// return (Config, error)
+func (c *Config) GetSubConfig(key string) (Config, error) {
+	val, err := c.Get(key)
+	if err != nil {
+		return Config{}, err
+	}
+	sc := val.(map[string]interface{})
+	return *(*Config)(unsafe.Pointer(&(sc))), nil
+}
+
+// GetRequiredSubConfig : get a subconfig referenced by key
 // return (Config)
-func (c *Config) GetSubConfig(key string) Config {
+func (c *Config) GetRequiredSubConfig(key string) Config {
 	sc := c.GetRequired(key).(map[string]interface{})
 	return *(*Config)(unsafe.Pointer(&sc))
 }

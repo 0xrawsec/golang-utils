@@ -66,9 +66,9 @@ func TestLoadJson(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	m := c.GetSubConfig("misp")
+	m := c.GetRequiredSubConfig("misp")
 	t.Log(m)
-	l := c.GetSubConfig("log-search")
+	l := c.GetRequiredSubConfig("log-search")
 	t.Log(l)
 	s := c.GetRequiredStringSlice("notification-recipients")
 	t.Log(s)
