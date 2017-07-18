@@ -165,10 +165,26 @@ func DontPanic(i interface{}) {
 	logMessage("PANIC - ", msg)
 }
 
+// DebugDontPanic only prints panic information but don't panic
+func DebugDontPanic(i interface{}) {
+	if gLogLevel <= LDebug {
+		msg := fmt.Sprintf("%v\n %s", i, debug.Stack())
+		logMessage("PANIC - ", msg)
+	}
+}
+
 // DontPanicf only prints panic information but don't panic
 func DontPanicf(format string, i ...interface{}) {
 	msg := fmt.Sprintf("%v\n %s", fmt.Sprintf(format, i...), debug.Stack())
 	logMessage("PANIC - ", msg)
+}
+
+// DebugDontPanicf only prints panic information but don't panic
+func DebugDontPanicf(format string, i ...interface{}) {
+	if gLogLevel <= LDebug {
+		msg := fmt.Sprintf("%v\n %s", fmt.Sprintf(format, i...), debug.Stack())
+		logMessage("PANIC - ", msg)
+	}
 }
 
 // Panic prints panic information and call panic
