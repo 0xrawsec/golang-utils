@@ -99,3 +99,11 @@ func IsLink(path string) bool {
 	}
 	return (s.Mode()&os.ModeSymlink == os.ModeSymlink)
 }
+
+// ResolveLink resolves the link if it is a Link or return the original path
+func ResolveLink(path string) (string, error) {
+	if IsLink(path) {
+		return os.Readlink(path)
+	}
+	return path, nil
+}

@@ -30,3 +30,7 @@ func (s *SyncedMap) Contains(key interface{}) (value interface{}, ok bool) {
 	value, ok = s.m[key]
 	return
 }
+
+func (s *SyncedMap) Len() int {
+	return len(s.m)
+}
