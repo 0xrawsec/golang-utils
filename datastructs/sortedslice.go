@@ -24,7 +24,7 @@ func NewSortedSlice(opts ...int) (ss SortedSlice) {
 		l = opts[0]
 	}
 	if len(opts) >= 2 {
-		c = opts[2]
+		c = opts[1]
 	}
 	ss.s = make([]Sortable, l, c)
 	return
