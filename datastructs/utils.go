@@ -10,7 +10,7 @@ func ToInterfaceSlice(slice interface{}) []interface{} {
 	v := reflect.ValueOf(slice)
 	is := make([]interface{}, 0)
 	if v.Kind() == reflect.Slice {
-		is = make([]interface{}, v.Len())
+		is = make([]interface{},0 ,v.Len())
 		for i := 0; i < v.Len(); i++ {
 			is = append(is, v.Index(i).Interface())
 		}
