@@ -98,6 +98,20 @@ func Infof(format string, i ...interface{}) {
 	}
 }
 
+// Warning log message if gLogLevel <= LInfo
+func Warn(i ...interface{}) {
+	if gLogLevel <= LInfo {
+		logMessage("Warning - ", i...)
+	}
+}
+
+// Warnf log message with format if gLogLevel <= LInfo
+func Warnf(format string, i ...interface{}) {
+	if gLogLevel <= LInfo {
+		logMessage("Warning - ", fmt.Sprintf(format, i...))
+	}
+}
+
 // Debug log message if gLogLevel <= LDebug
 func Debug(i ...interface{}) {
 	if gLogLevel <= LDebug {
