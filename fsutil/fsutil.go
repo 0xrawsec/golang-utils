@@ -100,6 +100,16 @@ func IsLink(path string) bool {
 	return (s.Mode()&os.ModeSymlink == os.ModeSymlink)
 }
 
+// Exists returns true if file at path exists
+func Exists(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	return true
+}
+
 // ResolveLink resolves the link if it is a Link or return the original path
 func ResolveLink(path string) (string, error) {
 	if IsLink(path) {
