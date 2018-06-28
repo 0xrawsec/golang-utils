@@ -150,5 +150,7 @@ func (l *LogFile) Write(b []byte) (int, error) {
 
 // Flush method
 func (l *LogFile) Flush() error {
+	l.Lock()
+	defer l.Unlock()
 	return l.writer.Flush()
 }
