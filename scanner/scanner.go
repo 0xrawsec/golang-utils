@@ -48,6 +48,7 @@ func New(r io.Reader) (s *Scanner) {
 
 // InitWhitespace initialised an new set of whitespaces for the scanner
 func (s *Scanner) InitWhitespace(w string) {
+	s.Whitespace = datastructs.NewBitSet(256)
 	for _, c := range w {
 		s.Whitespace.Set(int(c))
 	}
@@ -60,6 +61,8 @@ func (s *Scanner) Scan() (r rune) {
 	prevRune := r
 
 	if s.Whitespace.Get(int(r)) {
+		s.token[s.tokenIdx] = r
+		s.tokenIdx++
 		return r
 	}
 
@@ -90,4 +93,17 @@ func (s *Scanner) Scan() (r rune) {
 // TokenText returns the string containing characters until the token was found
 func (s *Scanner) TokenText() string {
 	return string(s.token[:s.tokenIdx])
+}
+
+// Tokenize returns a chan of tokens found in scanner until exhaustion
+func (s *Scanner) Tokenize() (cs chan string) {
+	cs = make(chan string)
+	go func() {
+		defer close(cs)
+		for r := s.Scan(); r != EOF; r = s.Scan() {
+			cs <- s.TokenText()
+		}
+		cs <- s.TokenText()
+	}()
+	return
 }

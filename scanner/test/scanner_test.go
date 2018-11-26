@@ -19,10 +19,10 @@ func TestScannerBasic(t *testing.T) {
 		case ':':
 			break
 		default:
-			t.Log(s.TokenText())
+			t.Logf("r=%q tokens=%s", r, s.TokenText())
 		}
 	}
-	t.Log(s.TokenText())
+	t.Logf("tokens=%s", s.TokenText())
 }
 
 func TestScannerBasic2(t *testing.T) {
@@ -33,8 +33,17 @@ func TestScannerBasic2(t *testing.T) {
 		case ':', '\n':
 			break
 		default:
-			t.Log(s.TokenText())
+			t.Logf("r=%q tokens=%s", r, s.TokenText())
 		}
 	}
-	t.Log(s.TokenText())
+	t.Logf("tokens=%s", s.TokenText())
+}
+
+func TestScannerTokenize(t *testing.T) {
+	s := scanner.New(strings.NewReader(nlcolontext))
+	s.InitWhitespace(":\n")
+	for tok := range s.Tokenize() {
+		t.Logf("tok=%q", tok)
+
+	}
 }
