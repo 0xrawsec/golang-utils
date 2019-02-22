@@ -10,9 +10,12 @@ import (
 	"unsafe"
 )
 
-type SubmatchHelper struct {
+// Helper structure definition
+type Helper struct {
 	IndexMap   map[string]int
 	timeLayout string
+	regex      *regexp.Regexp
+	submatch   [][]byte
 }
 
 var (
@@ -31,22 +34,27 @@ func (fnse FieldNotSetError) Error() string {
 	return fmt.Sprintf("Cannot set field: %s", fnse.Field)
 }
 
-// NewSubmatchHelper : creates a submatch helper from a regexp struct
-// @r: pointer to regexp struct
-// return (SubmatchHelper)
-func NewSubmatchHelper(r *regexp.Regexp) (sm SubmatchHelper) {
+// NewHelper : creates a new submatch helper from a regexp struct
+func NewHelper(r *regexp.Regexp) (sm Helper) {
 	sm.IndexMap = make(map[string]int)
 	for i, name := range r.SubexpNames() {
 		sm.IndexMap[name] = i
 	}
 	sm.timeLayout = time.RFC3339
+	sm.regex = r
 	return
 }
 
-// SetTimeLayout : setter for timeLayout field of SubmatchHelper to properly parse
-// timestamps
-// @layout : layout to switch to
-func (sh *SubmatchHelper) SetTimeLayout(layout string) {
+// Prepare : this method must be called on any []byte/string you
+// want the helper to work on. It basically apply regex.Regexp.FindSubmatch
+// on b and initializes internal helper member for further processing.
+func (sh *Helper) Prepare(b []byte) {
+	sh.submatch = sh.regex.FindSubmatch(b)
+}
+
+// SetTimeLayout : setter for timeLayout field of SubmatchHelper
+// to properly parse timestamps
+func (sh *Helper) SetTimeLayout(layout string) {
 	sh.timeLayout = layout
 }
 
@@ -99,12 +107,9 @@ func strParse(s *string, k reflect.Kind) (interface{}, error) {
 	return "", ErrUnparsableDestinationType
 }
 
-// Unmarshal : unmarshal submatches resulting from regexp.FindSubmatch and fill
-// structure accordingly
-// @sm: pointer to result of regexp.FindSubmatch
-// @v: pointer of struct to fill
-// return (error)
-func (sh *SubmatchHelper) Unmarshal(sm *[][]byte, v interface{}) error {
+// Unmarshal : unmarshal the data found by the Helper's regexp into v.
+// Helper needs to be prepared first through the Prepare function.
+func (sh *Helper) Unmarshal(v interface{}) error {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
 		return ErrNotValidPtr
@@ -115,7 +120,7 @@ func (sh *SubmatchHelper) Unmarshal(sm *[][]byte, v interface{}) error {
 		field := t.Field(i)
 		// Unmarshal recursively if field of struct is a struct
 		if s.Field(i).Kind() == reflect.Struct && s.Field(i).Type().Name() != TimeType.Name() {
-			if err := sh.Unmarshal(sm, s.Field(i).Addr().Interface()); err != nil {
+			if err := sh.Unmarshal(s.Field(i).Addr().Interface()); err != nil {
 				return err
 			}
 		} else {
@@ -126,7 +131,7 @@ func (sh *SubmatchHelper) Unmarshal(sm *[][]byte, v interface{}) error {
 				key = field.Name
 			}
 			// Get the matched value and update the interface if necessary
-			b, err := sh.GetBytes(key, sm)
+			b, err := sh.GetBytes(key)
 			switch err {
 			case nil:
 				var cast interface{}
@@ -142,7 +147,8 @@ func (sh *SubmatchHelper) Unmarshal(sm *[][]byte, v interface{}) error {
 					return err
 				}
 			case ErrNoSuchKey:
-				return FieldNotSetError{field.Name}
+				// It means we cannot set the field
+				//return FieldNotSetError{field.Name}
 			default:
 				return err
 			}
@@ -151,30 +157,13 @@ func (sh *SubmatchHelper) Unmarshal(sm *[][]byte, v interface{}) error {
 	return nil
 }
 
-// GetString : Get the matching string (if any) from regexp.FindStringSubmatch,
-// corresponding to a given key (named regexp)
-// @key: name of the regex subexpression
-// @sm: pointer to result of regexp.FindStringSubmatch
-// return (string, error): the associated match and error
-func (sh *SubmatchHelper) GetString(key string, sm *[]string) (string, error) {
+// GetBytes : Get the matching []byte (if any) extracted from
+// the data matched by the Helper's regexp. Helper needs to be
+// prepared using the Prepare function to work properly.
+func (sh *Helper) GetBytes(key string) ([]byte, error) {
 	if i, ok := sh.IndexMap[key]; ok {
-		if i <= len(*sm) {
-			return (*sm)[i], nil
-		}
-		return "", ErrIndexOutOfRange
-	}
-	return "", ErrNoSuchKey
-}
-
-// GetString : Get the matching []byte (if any) from regexp.FindSubmatch,
-// corresponding to a given key (named regexp)
-// @key: name of the regex subexpression
-// @sm: pointer to result of regexp.FindSubmatch
-// return ([]byte, error): the associated match and error
-func (sh *SubmatchHelper) GetBytes(key string, sm *[][]byte) ([]byte, error) {
-	if i, ok := sh.IndexMap[key]; ok {
-		if i <= len(*sm) {
-			return (*sm)[i], nil
+		if i <= len(sh.submatch) {
+			return sh.submatch[i], nil
 		}
 		return []byte{}, ErrIndexOutOfRange
 	}
