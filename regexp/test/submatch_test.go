@@ -18,7 +18,7 @@ type TestStructure struct {
 func TestGetByte(t *testing.T) {
 	rex := regexp.MustCompile("(?P<test>.*)")
 	line := "shouldmatcheverything"
-	sh := submatch.NewSubmatchHelper(rex)
+	sh := submatch.NewHelper(rex)
 	sh.Prepare([]byte(line))
 	val, err := sh.GetBytes("test")
 	t.Logf("Retrieved value: %s", val)
@@ -33,7 +33,7 @@ func TestGetByte(t *testing.T) {
 func TestUnmarshal(t *testing.T) {
 	rex := regexp.MustCompile("((?P<m1>.*?),(?P<m2>.*?),(?P<m3>.*?),(?P<m4>.*),)")
 	line := fmt.Sprintf("thisisastring,4,42,%s,", time.Now().Format(time.RFC1123Z))
-	sh := submatch.NewSubmatchHelper(rex)
+	sh := submatch.NewHelper(rex)
 	ts := TestStructure{}
 	sh.SetTimeLayout(time.RFC1123Z)
 	sh.Prepare([]byte(line))
