@@ -2,10 +2,11 @@ package scanner
 
 import (
 	"bufio"
-	"datastructs"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/0xrawsec/golang-utils/datastructs"
 )
 
 const (

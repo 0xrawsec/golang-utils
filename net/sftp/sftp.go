@@ -9,10 +9,9 @@ import (
 	"strings"
 	"unsafe"
 
-	"golang.org/x/crypto/ssh"
-
 	"github.com/0xrawsec/golang-utils/fsutil/fswalker"
 	"github.com/pkg/sftp"
+	"golang.org/x/crypto/ssh"
 )
 
 const (

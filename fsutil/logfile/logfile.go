@@ -3,10 +3,11 @@ package logfile
 import (
 	"compress/gzip"
 	"fmt"
-	"fsutil"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/0xrawsec/golang-utils/fsutil"
 )
 
 const (
