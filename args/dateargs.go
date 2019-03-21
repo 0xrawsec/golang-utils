@@ -1,8 +1,9 @@
 package args
 
 import (
-	"dateutil"
 	"time"
+
+	"github.com/0xrawsec/golang-utils/dateutil"
 )
 
 // DateVar struct
