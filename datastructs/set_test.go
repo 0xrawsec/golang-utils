@@ -37,4 +37,8 @@ func TestSets(t *testing.T) {
 	if !s1.Equal(&s1copy) {
 		t.Error("equality test failed")
 	}
+
+	for it := range union.Items() {
+		t.Logf("%v", it)
+	}
 }

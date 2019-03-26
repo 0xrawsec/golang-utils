@@ -104,6 +104,21 @@ func (s *SyncedSet) List() *[]interface{} {
 	return &l
 }
 
+// Items returns a channel with all the elements contained in the set
+func (s *SyncedSet) Items() (c chan interface{}) {
+	c = make(chan interface{})
+	go func() {
+		s.RLock()
+		defer s.RUnlock()
+		defer close(c)
+		for k := range s.set {
+			c <- k
+		}
+	}()
+	return c
+
+}
+
 // Len returns the length of the syncedset
 func (s *SyncedSet) Len() int {
 	return len(s.set)
