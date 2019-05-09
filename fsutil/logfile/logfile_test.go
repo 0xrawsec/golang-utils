@@ -3,16 +3,24 @@ package logfile
 import (
 	"crypto/rand"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
 var (
-	path = filepath.Join("test", "output", "logfile.log")
+	dir  = filepath.Join("test", "output")
+	path = filepath.Join(dir, "logfile.log")
 )
 
+func init() {
+	os.RemoveAll(dir)
+	os.MkdirAll(dir, 0777)
+}
+
 func TestLogfile(t *testing.T) {
+	var lf LogFile
 	size := int64(MB * 10)
 	lf, err := OpenFile(path, 0600, size)
 	if err != nil {
@@ -20,14 +28,39 @@ func TestLogfile(t *testing.T) {
 		t.Logf("Cannot create logfile: %s", err)
 		return
 	}
-	lf.SetRefreshRate(time.Nanosecond * 5)
+	lf.(*SizeRotateLogFile).SetRefreshRate(time.Nanosecond * 5)
 	defer lf.Close()
 	buff := make([]byte, 10)
 	lwritten := 0
 	for i := int64(0); i < size/5; i++ {
 		rand.Read(buff)
-		lf.WriteString(fmt.Sprintf("%q\n", buff))
+		lf.(*SizeRotateLogFile).WriteString(fmt.Sprintf("%q\n", buff))
 		lwritten++
 	}
 	t.Logf("Written %d lines", lwritten)
+}
+
+func TestTimeRotateLFBasic(t *testing.T) {
+	var lf LogFile
+	lf, err := OpenTimeRotateLogFile(path, 0600, 5*time.Second, 0)
+	if err != nil {
+		t.Fatalf("Failed to create logfile")
+		t.FailNow()
+	}
+	//defer lf.Close()
+	buff := make([]byte, 10)
+	lwritten := 0
+	for i := int64(0); i < 1000; i++ {
+		if i%500 == 0 {
+			time.Sleep(5 * time.Second)
+		}
+		rand.Read(buff)
+		if _, err := lf.(*TimeRotateLogFile).Write([]byte(fmt.Sprintf("%q\n", buff))); err != nil {
+			t.Logf("Error writting: %s", err)
+		}
+		lwritten++
+	}
+	t.Logf("Written %d lines", lwritten)
+	time.Sleep(15 * time.Second)
+	lf.Close()
 }

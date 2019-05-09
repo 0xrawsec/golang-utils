@@ -3,11 +3,14 @@ package logfile
 import (
 	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/0xrawsec/golang-utils/fileutils"
 	"github.com/0xrawsec/golang-utils/fsutil"
+	"github.com/0xrawsec/golang-utils/log"
 )
 
 const (
@@ -25,9 +28,151 @@ const (
 	DefaultRotationRate = time.Millisecond * 250
 )
 
-// LogFile structure definition
-// A LogFile is a GZIP compressed file which rotates automatically
-type LogFile struct {
+// LogFile interface
+type LogFile interface {
+	// Path returns the path of the current LogFile
+	Path() string
+	// Rotate ensures file rotation
+	Rotate() error
+	// Write used to write to the LogFile
+	Write([]byte) (int, error)
+	// Close used to close the LogFile
+	Close() error
+}
+
+// BaseLogFile structure definition
+type BaseLogFile struct {
+	sync.Mutex
+	path   string
+	prefix string
+	perm   os.FileMode
+	file   *os.File
+	writer io.Writer
+	done   chan bool
+}
+
+// Write implements LogFile interface
+func (b *BaseLogFile) Write(p []byte) (int, error) {
+	b.Lock()
+	defer b.Unlock()
+	return b.writer.Write(p)
+}
+
+// Path implements LogFile interface
+func (b *BaseLogFile) Path() string {
+	return fmt.Sprintf("%s.%s", b.path, b.prefix)
+}
+
+// Close implements LogFile interface
+func (b *BaseLogFile) Close() error {
+	b.Lock()
+	defer b.Unlock()
+	b.done <- true
+	return nil
+}
+
+// TimeRotateLogFile structure definition.
+// A TimeRotateLogFile rotates at whenever rotation delay expires.
+// The current file being used is in plain-text. Whenever the rotation
+// happens, the file is GZIP-ed to save space on disk. A delay can be
+// specified in order to wait before the file is compressed.
+type TimeRotateLogFile struct {
+	BaseLogFile
+	rotationDelay time.Duration
+	timer         *time.Timer
+	gzipDelay     time.Duration
+	wg            sync.WaitGroup
+}
+
+// OpenTimeRotateLogFile opens a new TimeRotateLogFile drot controls
+// the rotation delay and dgzip the time to wait before the latest file is GZIPed
+func OpenTimeRotateLogFile(path string, perm os.FileMode, drot time.Duration, dgzip time.Duration) (l *TimeRotateLogFile, err error) {
+
+	l = &TimeRotateLogFile{
+		rotationDelay: drot,
+		timer:         time.NewTimer(drot),
+		gzipDelay:     dgzip,
+		wg:            sync.WaitGroup{},
+	}
+
+	l.done = make(chan bool)
+	l.path = path
+	l.prefix = fmt.Sprintf("%d", time.Now().Unix())
+	l.perm = perm
+
+	l.file, err = os.OpenFile(l.Path(), os.O_CREATE|os.O_RDWR, l.perm)
+
+	if err != nil {
+		return
+	}
+
+	l.writer = l.file
+
+	// Go routine responsible of log rotation
+	l.wg.Add(1)
+	go func() {
+		defer l.wg.Done()
+		for {
+			select {
+			case <-l.done:
+				l.file.Close()
+				return
+			case <-l.timer.C:
+				if err := l.Rotate(); err != nil {
+					log.Errorf("Failed LogFile rotation: %s", err)
+				}
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+	}()
+
+	return
+}
+
+// Rotate implements LogFile interface
+func (l *TimeRotateLogFile) Rotate() (err error) {
+	l.Lock()
+	defer l.Unlock()
+	l.file.Close()
+	// Go Routine to gzip out the previous file
+	p := l.Path()
+	l.wg.Add(1)
+	go func() {
+		time.Sleep(l.gzipDelay)
+		if err := fileutils.GzipFile(p); err != nil {
+			log.Errorf("Failed to gzip LogFile: %s", err)
+		}
+		l.wg.Done()
+	}()
+
+	l.prefix = fmt.Sprintf("%d", time.Now().Unix())
+	l.file, err = os.OpenFile(l.Path(), os.O_CREATE|os.O_RDWR, l.perm)
+	l.writer = l.file
+	l.timer.Reset(l.rotationDelay)
+	return err
+}
+
+// Close implements LogFile interface. Whenever the TimeRotateLogFile is closed
+// the last file in use is GZIP compressed before Close returns
+func (l *TimeRotateLogFile) Close() error {
+	l.Lock()
+	defer l.Unlock()
+	l.done <- true
+	// timer needs to be stopped not to try to Rotate while
+	// some member have been uninitialized
+	l.timer.Stop()
+	l.wg.Wait()
+
+	if err := fileutils.GzipFile(l.Path()); err != nil {
+		log.Errorf("Failed to gzip LogFile: %s", err)
+	}
+
+	return nil
+}
+
+// SizeRotateLogFile structure definition
+// A SizeRotateLogFile is a GZIP compressed file which rotates automatically
+type SizeRotateLogFile struct {
 	sync.Mutex
 	idx    int
 	path   string
@@ -39,8 +184,8 @@ type LogFile struct {
 }
 
 // OpenFile opens a new file for logging
-func OpenFile(path string, perm os.FileMode, size int64) (*LogFile, error) {
-	l := LogFile{}
+func OpenFile(path string, perm os.FileMode, size int64) (*SizeRotateLogFile, error) {
+	l := SizeRotateLogFile{}
 	l.path = path
 	l.perm = perm
 	l.size = size
@@ -63,8 +208,8 @@ func OpenFile(path string, perm os.FileMode, size int64) (*LogFile, error) {
 	return &l, nil
 }
 
-// Path returns the path of the LogFile
-func (l *LogFile) Path() string {
+// Path returns the path of the LogFileSizeRotate
+func (l *SizeRotateLogFile) Path() string {
 	if l.idx == 0 {
 		return l.path
 	}
@@ -72,7 +217,7 @@ func (l *LogFile) Path() string {
 }
 
 // helper function to retrieve the first available file for writing
-func (l *LogFile) searchFirstAvPath() error {
+func (l *SizeRotateLogFile) searchFirstAvPath() error {
 	for {
 		if fsutil.Exists(l.Path()) {
 			stats, err := os.Stat(l.Path())
@@ -90,8 +235,8 @@ func (l *LogFile) searchFirstAvPath() error {
 	}
 }
 
-// helper function which rotate the logfile when needed
-func (l *LogFile) rotateRoutine() {
+// helper function which rotate the LogFileSizeRotate when needed
+func (l *SizeRotateLogFile) rotateRoutine() {
 	go func() {
 		for {
 			if stats, err := os.Stat(l.Path()); err == nil {
@@ -104,14 +249,14 @@ func (l *LogFile) rotateRoutine() {
 	}()
 }
 
-// SetRefreshRate sets the rate at which the LogFile should check for rotating
+// SetRefreshRate sets the rate at which the LogFileSizeRotate should check for rotating
 // check DefaultRotationRate for default value
-func (l *LogFile) SetRefreshRate(rate time.Duration) {
+func (l *SizeRotateLogFile) SetRefreshRate(rate time.Duration) {
 	l.rate = rate
 }
 
-// Rotate rotates the current LogFile
-func (l *LogFile) Rotate() error {
+// Rotate rotates the current LogFileSizeRotate
+func (l *SizeRotateLogFile) Rotate() error {
 	l.Lock()
 	defer l.Unlock()
 	// We close everything first
@@ -128,29 +273,29 @@ func (l *LogFile) Rotate() error {
 	return nil
 }
 
-// Close closes the LogFile properly
-func (l *LogFile) Close() error {
+// Close closes the LogFileSizeRotate properly
+func (l *SizeRotateLogFile) Close() error {
 	l.writer.Flush()
 	l.writer.Close()
 	return l.file.Close()
 }
 
-// WriteString writes a string into the LogFile
-func (l *LogFile) WriteString(s string) (int, error) {
+// WriteString writes a string into the LogFileSizeRotate
+func (l *SizeRotateLogFile) WriteString(s string) (int, error) {
 	l.Lock()
 	defer l.Unlock()
 	return l.writer.Write([]byte(s))
 }
 
-// Write writes bytes into the LogFile
-func (l *LogFile) Write(b []byte) (int, error) {
+// Write writes bytes into the LogFileSizeRotate
+func (l *SizeRotateLogFile) Write(b []byte) (int, error) {
 	l.Lock()
 	defer l.Unlock()
 	return l.writer.Write(b)
 }
 
 // Flush method
-func (l *LogFile) Flush() error {
+func (l *SizeRotateLogFile) Flush() error {
 	l.Lock()
 	defer l.Unlock()
 	return l.writer.Flush()
