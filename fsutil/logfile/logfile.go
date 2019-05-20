@@ -1,15 +1,18 @@
 package logfile
 
 import (
-	"compress/gzip"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/0xrawsec/golang-utils/fileutils"
 	"github.com/0xrawsec/golang-utils/fsutil"
+	"github.com/0xrawsec/golang-utils/fsutil/fswalker"
 	"github.com/0xrawsec/golang-utils/log"
 )
 
@@ -34,6 +37,8 @@ type LogFile interface {
 	Path() string
 	// Rotate ensures file rotation
 	Rotate() error
+	// Rotation routine
+	RotRoutine()
 	// Write used to write to the LogFile
 	Write([]byte) (int, error)
 	// Close used to close the LogFile
@@ -43,12 +48,98 @@ type LogFile interface {
 // BaseLogFile structure definition
 type BaseLogFile struct {
 	sync.Mutex
-	path   string
-	prefix string
+	base string
+	dir  string
+	path string
+	//prefix string
 	perm   os.FileMode
 	file   *os.File
 	writer io.Writer
 	done   chan bool
+	wg     sync.WaitGroup
+}
+
+// Rotate implements LogFile interface
+func (b *BaseLogFile) Rotate() (err error) {
+	b.Lock()
+	defer b.Unlock()
+	b.file.Close()
+
+	// First rename all the gzip files
+	// First find max file index
+	maxIdx := uint64(0)
+	for wi := range fswalker.Walk(filepath.Dir(b.path)) {
+		for _, fi := range wi.Files {
+			if strings.HasPrefix(fi.Name(), b.base) && strings.HasSuffix(fi.Name(), ".gz") {
+				ext := strings.TrimLeft(fi.Name(), fmt.Sprintf("%s.", b.base))
+				sp := strings.SplitN(ext, ".", 2)
+				if len(sp) == 2 {
+					id, err := strconv.ParseUint(sp[0], 0, 64)
+					if err != nil {
+						log.Info(fi.Name())
+						log.Errorf("Cannot parse logfile id: %s", err)
+					}
+					if id > maxIdx {
+						maxIdx = id
+					}
+				}
+			}
+		}
+	}
+
+	// Actually renaming
+	for i := maxIdx; i > 0; i-- {
+		// renaming the zip file
+		oldf := fmt.Sprintf("%s.%d.gz", b.path, i)
+		newf := fmt.Sprintf("%s.%d.gz", b.path, i+1)
+		// because there we do not guarantee that oldf exists due to previous loop
+		if fsutil.IsFile(oldf) {
+			if err := os.Rename(oldf, newf); err != nil {
+				log.Errorf("Failed to rename old logfile: %s", err)
+			}
+		}
+	}
+
+	// Rename basename.1 to basename.2
+	dot1 := fmt.Sprintf("%s.1", b.path)
+	dot2 := fmt.Sprintf("%s.2", b.path)
+	// path to part file to control that we are not already compressing
+	dot2Part := fmt.Sprintf("%s.2.gz.part", b.path)
+
+	// Should not happen but that's a precaution step not to overwrite dot2
+	// without knowing it
+	if fsutil.IsFile(dot2) && !fsutil.IsFile(dot2Part) {
+		if err := fileutils.GzipFile(dot2); err != nil {
+			log.Errorf("Failed to gzip LogFile: %s", err)
+		}
+	}
+
+	if fsutil.IsFile(dot1) {
+		if err := os.Rename(dot1, dot2); err != nil {
+			log.Errorf("Failed to rename old file: %s", err)
+		} else {
+			// Start a routine to gzip dot2
+			b.wg.Add(1)
+			go func() {
+				defer b.wg.Done()
+				if fsutil.IsFile(dot2) && !fsutil.IsFile(dot2Part) {
+					if err := fileutils.GzipFile(dot2); err != nil {
+						log.Errorf("Failed to gzip LogFile: %s", err)
+					}
+				}
+			}()
+		}
+	}
+
+	// Move current to basename.1
+	if err := os.Rename(b.path, dot1); err != nil {
+		log.Errorf("Failed to rename old file: %s", err)
+	}
+
+	b.file, err = os.OpenFile(b.path, os.O_APPEND|os.O_CREATE|os.O_RDWR, b.perm)
+	b.writer = b.file
+	//l.timer.Reset(l.rotationDelay)
+	return err
 }
 
 // Write implements LogFile interface
@@ -58,9 +149,14 @@ func (b *BaseLogFile) Write(p []byte) (int, error) {
 	return b.writer.Write(p)
 }
 
+// WriteString implements LogFile interface
+func (b *BaseLogFile) WriteString(s string) (int, error) {
+	return b.Write([]byte(s))
+}
+
 // Path implements LogFile interface
 func (b *BaseLogFile) Path() string {
-	return fmt.Sprintf("%s.%s", b.path, b.prefix)
+	return b.path
 }
 
 // Close implements LogFile interface
@@ -68,6 +164,7 @@ func (b *BaseLogFile) Close() error {
 	b.Lock()
 	defer b.Unlock()
 	b.done <- true
+	b.wg.Wait()
 	return nil
 }
 
@@ -80,27 +177,25 @@ type TimeRotateLogFile struct {
 	BaseLogFile
 	rotationDelay time.Duration
 	timer         *time.Timer
-	gzipDelay     time.Duration
-	wg            sync.WaitGroup
 }
 
 // OpenTimeRotateLogFile opens a new TimeRotateLogFile drot controls
 // the rotation delay and dgzip the time to wait before the latest file is GZIPed
-func OpenTimeRotateLogFile(path string, perm os.FileMode, drot time.Duration, dgzip time.Duration) (l *TimeRotateLogFile, err error) {
+func OpenTimeRotateLogFile(path string, perm os.FileMode, drot time.Duration) (l *TimeRotateLogFile, err error) {
 
-	l = &TimeRotateLogFile{
-		rotationDelay: drot,
-		timer:         time.NewTimer(drot),
-		gzipDelay:     dgzip,
-		wg:            sync.WaitGroup{},
-	}
-
-	l.done = make(chan bool)
+	l = &TimeRotateLogFile{}
+	// BaseLogfile fields
+	l.base = filepath.Base(path)
+	l.dir = filepath.Dir(path)
 	l.path = path
-	l.prefix = fmt.Sprintf("%d", time.Now().Unix())
 	l.perm = perm
+	l.wg = sync.WaitGroup{}
+	l.done = make(chan bool)
+	// TimeRotateLogFile fields
+	l.timer = time.NewTimer(drot)
+	l.rotationDelay = drot
 
-	l.file, err = os.OpenFile(l.Path(), os.O_CREATE|os.O_RDWR, l.perm)
+	l.file, err = os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_RDWR, l.perm)
 
 	if err != nil {
 		return
@@ -108,52 +203,32 @@ func OpenTimeRotateLogFile(path string, perm os.FileMode, drot time.Duration, dg
 
 	l.writer = l.file
 
-	// Go routine responsible of log rotation
+	// Go routine responsible for log rotation
 	l.wg.Add(1)
-	go func() {
-		defer l.wg.Done()
-		for {
-			select {
-			case <-l.done:
-				l.file.Close()
-				return
-			case <-l.timer.C:
-				if err := l.Rotate(); err != nil {
-					log.Errorf("Failed LogFile rotation: %s", err)
-				}
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-	}()
+	go l.RotRoutine()
 
 	return
 }
 
-// Rotate implements LogFile interface
-func (l *TimeRotateLogFile) Rotate() (err error) {
-	l.Lock()
-	defer l.Unlock()
-	l.file.Close()
-	// Go Routine to gzip out the previous file
-	p := l.Path()
-	l.wg.Add(1)
-	go func() {
-		time.Sleep(l.gzipDelay)
-		if err := fileutils.GzipFile(p); err != nil {
-			log.Errorf("Failed to gzip LogFile: %s", err)
+// RotRoutine implements LogFile
+func (l *TimeRotateLogFile) RotRoutine() {
+	defer l.wg.Done()
+	for {
+		select {
+		case <-l.done:
+			l.file.Close()
+			return
+		case <-l.timer.C:
+			if err := l.Rotate(); err != nil {
+				log.Errorf("Failed LogFile rotation: %s", err)
+			}
+			l.timer.Reset(l.rotationDelay)
 		}
-		l.wg.Done()
-	}()
-
-	l.prefix = fmt.Sprintf("%d", time.Now().Unix())
-	l.file, err = os.OpenFile(l.Path(), os.O_CREATE|os.O_RDWR, l.perm)
-	l.writer = l.file
-	l.timer.Reset(l.rotationDelay)
-	return err
+		time.Sleep(time.Millisecond * 500)
+	}
 }
 
-// Close implements LogFile interface. Whenever the TimeRotateLogFile is closed
-// the last file in use is GZIP compressed before Close returns
+// Close implements LogFile interface
 func (l *TimeRotateLogFile) Close() error {
 	l.Lock()
 	defer l.Unlock()
@@ -163,140 +238,59 @@ func (l *TimeRotateLogFile) Close() error {
 	l.timer.Stop()
 	l.wg.Wait()
 
-	if err := fileutils.GzipFile(l.Path()); err != nil {
-		log.Errorf("Failed to gzip LogFile: %s", err)
-	}
-
 	return nil
 }
 
 // SizeRotateLogFile structure definition
 // A SizeRotateLogFile is a GZIP compressed file which rotates automatically
 type SizeRotateLogFile struct {
-	sync.Mutex
-	idx    int
-	path   string
-	perm   os.FileMode
-	file   *os.File
-	writer *gzip.Writer
-	size   int64
-	rate   time.Duration
+	BaseLogFile
+	size int64
 }
 
-// OpenFile opens a new file for logging
-func OpenFile(path string, perm os.FileMode, size int64) (*SizeRotateLogFile, error) {
+// OpenSizeRotateLogFile opens a new log file for logging rotating
+// according to its own size
+func OpenSizeRotateLogFile(path string, perm os.FileMode, size int64) (*SizeRotateLogFile, error) {
 	l := SizeRotateLogFile{}
+	l.base = filepath.Base(path)
+	l.dir = filepath.Dir(path)
 	l.path = path
 	l.perm = perm
+	l.wg = sync.WaitGroup{}
+	l.done = make(chan bool)
+	// fields specific to SizeRotateLogFile
 	l.size = size
-	l.rate = DefaultRotationRate
 
-	// Search for the first available path
-	err := l.searchFirstAvPath()
-	if err != nil {
-		return nil, err
-	}
 	// Open the file descriptor
 	f, err := os.OpenFile(l.Path(), os.O_APPEND|os.O_CREATE|os.O_RDWR, l.perm)
 	if err != nil {
 		return nil, err
 	}
+
 	l.file = f
-	l.writer = gzip.NewWriter(f)
+	l.writer = l.file
 	// We start the rotate routine
-	l.rotateRoutine()
+
+	l.wg.Add(1)
+	go l.RotRoutine()
 	return &l, nil
 }
 
-// Path returns the path of the LogFileSizeRotate
-func (l *SizeRotateLogFile) Path() string {
-	if l.idx == 0 {
-		return l.path
-	}
-	return fmt.Sprintf("%s.%d", l.path, l.idx)
-}
-
-// helper function to retrieve the first available file for writing
-func (l *SizeRotateLogFile) searchFirstAvPath() error {
+// RotRoutine implements LogFile
+func (l *SizeRotateLogFile) RotRoutine() {
+	defer l.wg.Done()
 	for {
-		if fsutil.Exists(l.Path()) {
-			stats, err := os.Stat(l.Path())
-			if err != nil {
-				return err
-			}
-			if stats.Size() >= l.size {
-				l.idx++
-			} else {
-				return nil
-			}
-		} else {
-			return nil
-		}
-	}
-}
-
-// helper function which rotate the LogFileSizeRotate when needed
-func (l *SizeRotateLogFile) rotateRoutine() {
-	go func() {
-		for {
-			if stats, err := os.Stat(l.Path()); err == nil {
+		select {
+		case <-l.done:
+			l.file.Close()
+			return
+		default:
+			if stats, err := os.Stat(l.path); err == nil {
 				if stats.Size() >= l.size {
 					l.Rotate()
 				}
 			}
-			time.Sleep(l.rate)
 		}
-	}()
-}
-
-// SetRefreshRate sets the rate at which the LogFileSizeRotate should check for rotating
-// check DefaultRotationRate for default value
-func (l *SizeRotateLogFile) SetRefreshRate(rate time.Duration) {
-	l.rate = rate
-}
-
-// Rotate rotates the current LogFileSizeRotate
-func (l *SizeRotateLogFile) Rotate() error {
-	l.Lock()
-	defer l.Unlock()
-	// We close everything first
-	l.Close()
-	if err := l.searchFirstAvPath(); err != nil {
-		return err
+		time.Sleep(time.Millisecond * 500)
 	}
-	f, err := os.OpenFile(l.Path(), os.O_APPEND|os.O_CREATE|os.O_RDWR, l.perm)
-	if err != nil {
-		return err
-	}
-	l.file = f
-	l.writer = gzip.NewWriter(l.file)
-	return nil
-}
-
-// Close closes the LogFileSizeRotate properly
-func (l *SizeRotateLogFile) Close() error {
-	l.writer.Flush()
-	l.writer.Close()
-	return l.file.Close()
-}
-
-// WriteString writes a string into the LogFileSizeRotate
-func (l *SizeRotateLogFile) WriteString(s string) (int, error) {
-	l.Lock()
-	defer l.Unlock()
-	return l.writer.Write([]byte(s))
-}
-
-// Write writes bytes into the LogFileSizeRotate
-func (l *SizeRotateLogFile) Write(b []byte) (int, error) {
-	l.Lock()
-	defer l.Unlock()
-	return l.writer.Write(b)
-}
-
-// Flush method
-func (l *SizeRotateLogFile) Flush() error {
-	l.Lock()
-	defer l.Unlock()
-	return l.writer.Flush()
 }

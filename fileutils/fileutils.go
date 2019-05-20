@@ -1,10 +1,10 @@
 package fileutils
 
 import (
-	"os"
+	"compress/gzip"
 	"fmt"
 	"io"
-	"compress/gzip"
+	"os"
 )
 
 // GzipFile compresses a file to gzip and deletes the original file
@@ -14,10 +14,17 @@ func GzipFile(path string) (err error) {
 	if err != nil {
 		return
 	}
-	//defer f.Close()
+
 	fname := fmt.Sprintf("%s.gz", path)
 	partname := fmt.Sprintf("%s.part", fname)
-	of, err := os.Create(partname)
+
+	// to keep permission of compressed file
+	stat, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+
+	of, err := os.OpenFile(partname, os.O_CREATE|os.O_WRONLY, stat.Mode())
 	if err != nil {
 		return
 	}

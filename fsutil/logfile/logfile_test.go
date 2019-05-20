@@ -22,13 +22,14 @@ func init() {
 func TestLogfile(t *testing.T) {
 	var lf LogFile
 	size := int64(MB * 10)
-	lf, err := OpenFile(path, 0600, size)
+	lf, err := OpenSizeRotateLogFile(path, 0600, size)
+
 	if err != nil {
 		t.Fail()
 		t.Logf("Cannot create logfile: %s", err)
 		return
 	}
-	lf.(*SizeRotateLogFile).SetRefreshRate(time.Nanosecond * 5)
+	//lf.(*SizeRotateLogFile).SetRefreshRate(time.Nanosecond * 5)
 	defer lf.Close()
 	buff := make([]byte, 10)
 	lwritten := 0
@@ -42,7 +43,7 @@ func TestLogfile(t *testing.T) {
 
 func TestTimeRotateLFBasic(t *testing.T) {
 	var lf LogFile
-	lf, err := OpenTimeRotateLogFile(path, 0600, 5*time.Second, 0)
+	lf, err := OpenTimeRotateLogFile(path, 0600, 1*time.Second)
 	if err != nil {
 		t.Fatalf("Failed to create logfile")
 		t.FailNow()
@@ -52,7 +53,7 @@ func TestTimeRotateLFBasic(t *testing.T) {
 	lwritten := 0
 	for i := int64(0); i < 1000; i++ {
 		if i%500 == 0 {
-			time.Sleep(5 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 		rand.Read(buff)
 		if _, err := lf.(*TimeRotateLogFile).Write([]byte(fmt.Sprintf("%q\n", buff))); err != nil {
@@ -61,6 +62,6 @@ func TestTimeRotateLFBasic(t *testing.T) {
 		lwritten++
 	}
 	t.Logf("Written %d lines", lwritten)
-	time.Sleep(15 * time.Second)
+	time.Sleep(3 * time.Second)
 	lf.Close()
 }
