@@ -65,3 +65,16 @@ func TestTimeRotateLFBasic(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	lf.Close()
 }
+
+func TestTimeRotateLFRotateOld(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		lf, err := OpenTimeRotateLogFile(path, 0600, 500*time.Millisecond)
+		if err != nil {
+			t.Fatalf("Failed to create logfile")
+			t.FailNow()
+		}
+		lf.Close()
+		time.Sleep(1 * time.Second)
+	}
+
+}

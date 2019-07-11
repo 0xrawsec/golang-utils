@@ -161,8 +161,10 @@ func (b *BaseLogFile) Path() string {
 
 // Close implements LogFile interface
 func (b *BaseLogFile) Close() error {
-	b.Lock()
-	defer b.Unlock()
+	// don't need to l.Lock here since l.done
+	// will play the role of the semaphore
+	// i.e. we go on next instruction only when bool is pulled
+	// from l.done
 	b.done <- true
 	b.wg.Wait()
 	return nil
@@ -191,8 +193,27 @@ func OpenTimeRotateLogFile(path string, perm os.FileMode, drot time.Duration) (l
 	l.perm = perm
 	l.wg = sync.WaitGroup{}
 	l.done = make(chan bool)
+
 	// TimeRotateLogFile fields
-	l.timer = time.NewTimer(drot)
+
+	// initializes l.timer so that it is aware of the
+	// previous logfile writes
+	if s, e := os.Stat(l.path); e == nil {
+		firstRot := time.Now().Sub(s.ModTime())
+		switch {
+		case firstRot < 0:
+			l.timer = time.NewTimer(drot)
+		case firstRot > drot:
+			// basically tell to rotate now
+			l.timer = time.NewTimer(0)
+		default:
+			// first rotate at
+			l.timer = time.NewTimer(firstRot)
+		}
+	} else {
+		l.timer = time.NewTimer(drot)
+	}
+
 	l.rotationDelay = drot
 
 	l.file, err = os.OpenFile(l.path, os.O_APPEND|os.O_CREATE|os.O_RDWR, l.perm)
@@ -230,8 +251,10 @@ func (l *TimeRotateLogFile) RotRoutine() {
 
 // Close implements LogFile interface
 func (l *TimeRotateLogFile) Close() error {
-	l.Lock()
-	defer l.Unlock()
+	// don't need to l.Lock here since l.done
+	// will play the role of the semaphore
+	// i.e. we go on next instruction only when bool is pulled
+	// from l.done
 	l.done <- true
 	// timer needs to be stopped not to try to Rotate while
 	// some member have been uninitialized
