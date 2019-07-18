@@ -9,13 +9,13 @@ import (
 )
 
 type Element struct {
-	value interface{}
-	prev  *Element
-	next  *Element
+	Value interface{}
+	Prev  *Element
+	Next  *Element
 }
 
 func (e *Element) String() string {
-	return fmt.Sprintf("(%T(%v), %p, %p)", e.value, e.value, e.prev, e.next)
+	return fmt.Sprintf("(%T(%v), %p, %p)", e.Value, e.Value, e.Prev, e.Next)
 }
 
 type Fifo struct {
@@ -28,13 +28,13 @@ type Fifo struct {
 func (f *Fifo) Push(i interface{}) {
 	f.Lock()
 	defer f.Unlock()
-	e := Element{value: i}
+	e := Element{Value: i}
 	if f.e == nil {
 		f.e = &e
 		f.last = &e
 	} else {
-		e.next = f.e
-		f.e.prev = &e
+		e.Next = f.e
+		f.e.Prev = &e
 		f.e = &e
 	}
 	f.size++
@@ -44,7 +44,7 @@ func (f *Fifo) String() string {
 	f.RLock()
 	defer f.RUnlock()
 	out := make([]string, 0)
-	for e := f.e; e != nil; e = e.next {
+	for e := f.e; e != nil; e = e.Next {
 		log.Info(e)
 		out = append(out, e.String())
 	}
@@ -65,9 +65,9 @@ func (f *Fifo) Pop() *Element {
 	}
 
 	popped := f.last
-	f.last = f.last.prev
+	f.last = f.last.Prev
 	if f.last != nil {
-		f.last.next = nil
+		f.last.Next = nil
 	}
 	f.size--
 	return popped
