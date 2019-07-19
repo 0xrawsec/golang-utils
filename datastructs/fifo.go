@@ -71,7 +71,7 @@ func (f *Fifo) Pop() *Element {
 	}
 	// we have to nil out f.e if we pop
 	// the last element of the Fifo
-	if f.e == f.last {
+	if f.size == 1 {
 		f.e = nil
 	}
 	f.size--
