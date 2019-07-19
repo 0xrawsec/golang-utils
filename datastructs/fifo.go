@@ -54,7 +54,7 @@ func (f *Fifo) String() string {
 func (f *Fifo) Empty() bool {
 	f.RLock()
 	defer f.RUnlock()
-	return f.last == nil
+	return f.size == 0
 }
 
 func (f *Fifo) Pop() *Element {
@@ -68,6 +68,11 @@ func (f *Fifo) Pop() *Element {
 	f.last = f.last.Prev
 	if f.last != nil {
 		f.last.Next = nil
+	}
+	// we have to nil out f.e if we pop
+	// the last element of the Fifo
+	if f.e == f.last {
+		f.e = nil
 	}
 	f.size--
 	return popped
