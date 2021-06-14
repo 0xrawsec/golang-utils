@@ -1,6 +1,7 @@
 package datastructs
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -40,5 +41,28 @@ func TestSets(t *testing.T) {
 
 	for it := range union.Items() {
 		t.Logf("%v", it)
+	}
+}
+func TestSetJSON(t *testing.T) {
+	var data []byte
+	var err error
+
+	s1 := NewSyncedSet()
+	s1.Add("This", "is", "bar", "!!!", "!!!!!!!")
+
+	if data, err = json.Marshal(&s1); err != nil {
+		t.Error("Failed to marshal JSON")
+	} else {
+		t.Log(string(data))
+	}
+
+	s2 := NewSyncedSet()
+	if err = json.Unmarshal(data, &s2); err != nil {
+		t.Errorf("Failed to unmarshal JSON: %s", err)
+		t.FailNow()
+	}
+
+	if !s2.Contains("This", "is", "bar", "!!!", "!!!!!!!") {
+		t.Error("Set does not contain expected data")
 	}
 }

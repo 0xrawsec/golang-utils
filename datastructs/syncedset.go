@@ -1,6 +1,7 @@
 package datastructs
 
 import (
+	"encoding/json"
 	"reflect"
 	"sync"
 )
@@ -17,12 +18,13 @@ func NewSyncedSet(sets ...*SyncedSet) (ss SyncedSet) {
 	if len(sets) > 0 {
 		for _, s := range sets {
 			pDatas := s.List()
-			ss.Add(*pDatas...)
+			ss.Add(pDatas...)
 		}
 	}
 	return
 }
 
+// NewInitSyncedSet constructs a new SyncedSet initialized with data
 func NewInitSyncedSet(data ...interface{}) (ss SyncedSet) {
 	ss.set = make(map[interface{}]bool)
 	ss.Add(data...)
@@ -92,7 +94,7 @@ func (s *SyncedSet) Contains(datas ...interface{}) bool {
 }
 
 // List returns a pointer to a new list containing the data in the set
-func (s *SyncedSet) List() *[]interface{} {
+func (s *SyncedSet) List() []interface{} {
 	s.RLock()
 	defer s.RUnlock()
 	i := 0
@@ -101,7 +103,7 @@ func (s *SyncedSet) List() *[]interface{} {
 		l[i] = k
 		i++
 	}
-	return &l
+	return l
 }
 
 // Items returns a channel with all the elements contained in the set
@@ -122,4 +124,26 @@ func (s *SyncedSet) Items() (c chan interface{}) {
 // Len returns the length of the syncedset
 func (s *SyncedSet) Len() int {
 	return len(s.set)
+}
+
+// UnmarshalJSON implements json.Unmarshaler interface
+func (s *SyncedSet) UnmarshalJSON(data []byte) (err error) {
+	s.Lock()
+	defer s.Unlock()
+	tmp := make([]interface{}, 0)
+	s.set = make(map[interface{}]bool)
+	if err = json.Unmarshal(data, &tmp); err != nil {
+		return err
+	}
+	for _, data := range tmp {
+		s.set[data] = true
+	}
+	return
+}
+
+// MarshalJSON implements json.Marshaler interface
+func (s *SyncedSet) MarshalJSON() (data []byte, err error) {
+	s.RLock()
+	defer s.RUnlock()
+	return json.Marshal(s.List())
 }

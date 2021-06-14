@@ -44,7 +44,7 @@ func (s *SyncedMap) Keys() chan interface{} {
 		defer close(ci)
 		s.RLock()
 		defer s.RUnlock()
-		for k, _ := range s.m {
+		for k := range s.m {
 			ci <- k
 		}
 	}()
