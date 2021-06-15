@@ -18,7 +18,7 @@ type SortedSlice struct {
 
 // NewSortedSlice returns an empty initialized slice. Opts takes len and cap in
 // order to initialize the underlying slice
-func NewSortedSlice(opts ...int) (ss SortedSlice) {
+func NewSortedSlice(opts ...int) *SortedSlice {
 	l, c := 0, 0
 	if len(opts) >= 1 {
 		l = opts[0]
@@ -26,8 +26,7 @@ func NewSortedSlice(opts ...int) (ss SortedSlice) {
 	if len(opts) >= 2 {
 		c = opts[1]
 	}
-	ss.s = make([]Sortable, l, c)
-	return
+	return &SortedSlice{make([]Sortable, l, c)}
 }
 
 // Recursive function to search for the next index less than Sortable

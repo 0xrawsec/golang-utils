@@ -12,10 +12,11 @@ type Item struct {
 	Value interface{}
 }
 
-func NewHashMap() (hm HashMap) {
-	hm.keys = make(map[string]Hashable)
-	hm.values = make(map[string]interface{})
-	return hm
+func NewHashMap() (hm *HashMap) {
+	return &HashMap{
+		make(map[string]Hashable),
+		make(map[string]interface{}),
+	}
 }
 
 // Contains returns true if the HashMap contains element referenced by key
@@ -95,7 +96,8 @@ type SyncedHashMap struct {
 }
 
 // NewSyncedHashMap SyncedHashMap constructor
-func NewSyncedHashMap() (hm SyncedHashMap) {
+func NewSyncedHashMap() (hm *SyncedHashMap) {
+	hm = &SyncedHashMap{}
 	hm.keys = make(map[string]Hashable)
 	hm.values = make(map[string]interface{})
 	return hm

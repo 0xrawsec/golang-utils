@@ -10,10 +10,10 @@ func TestSets(t *testing.T) {
 	s2 := NewSyncedSet()
 	s1.Add("This", "is", "foo", "!!", "!!!!")
 	s2.Add("This", "is", "bar", "!!!", "!!!!!!!")
-	s1copy := NewSyncedSet(&s1)
+	s1copy := NewSyncedSet(s1)
 
-	intersection := s1.Intersect(&s2)
-	union := s1.Union(&s2)
+	intersection := s1.Intersect(s2)
+	union := s1.Union(s2)
 
 	t.Logf("s1.List: %v", s1.List())
 	t.Logf("s2.List: %v", s2.List())
@@ -35,7 +35,7 @@ func TestSets(t *testing.T) {
 	}
 	t.Logf("union after delete: %v", union.List())
 
-	if !s1.Equal(&s1copy) {
+	if !s1.Equal(s1copy) {
 		t.Error("equality test failed")
 	}
 

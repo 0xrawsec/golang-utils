@@ -1,7 +1,6 @@
 package datastructs
 
 import (
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -33,7 +32,7 @@ func TestInsert(t *testing.T) {
 	s := NewSortedSlice()
 	for _, i := range ints {
 		s.Insert(MyInt(i))
-		fmt.Println(s)
+		t.Log(s)
 		if !s.Control() {
 			t.Fail()
 		}
@@ -81,7 +80,7 @@ func TestSearchRange(t *testing.T) {
 	s := NewSortedSlice()
 	for _, i := range ints {
 		s.Insert(MyInt(i))
-		fmt.Println(s)
+		t.Log(s)
 		if !s.Control() {
 			t.Fail()
 		}
@@ -94,7 +93,7 @@ func TestIter(t *testing.T) {
 	s := NewSortedSlice()
 	for _, i := range ints {
 		s.Insert(MyInt(i))
-		fmt.Println(s)
+		t.Log(s)
 		if !s.Control() {
 			t.Fail()
 		}

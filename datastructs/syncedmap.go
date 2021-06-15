@@ -7,9 +7,8 @@ type SyncedMap struct {
 	m map[interface{}]interface{}
 }
 
-func NewSyncedMap() (s SyncedMap) {
-	s.m = make(map[interface{}]interface{})
-	return
+func NewSyncedMap() *SyncedMap {
+	return &SyncedMap{m: make(map[interface{}]interface{})}
 }
 
 func (s *SyncedMap) Add(key, value interface{}) {
