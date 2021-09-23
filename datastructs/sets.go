@@ -2,18 +2,18 @@ package datastructs
 
 import (
 	"encoding/json"
-	"reflect"
 	"sync"
 )
 
 // Set datastruct that represent a thread safe set
 type Set struct {
-	set map[interface{}]bool
+	i   uint
+	set map[interface{}]uint
 }
 
 // NewSet constructs a new SyncedSet
 func NewSet(sets ...*Set) *Set {
-	s := &Set{make(map[interface{}]bool)}
+	s := &Set{0, make(map[interface{}]uint)}
 	for _, set := range sets {
 		pDatas := set.List()
 		s.Add(pDatas...)
@@ -30,8 +30,15 @@ func NewInitSet(data ...interface{}) *Set {
 
 // Equal returns true if both sets are equal
 func (s *Set) Equal(other *Set) bool {
-	test := reflect.DeepEqual(s.set, other.set)
-	return test
+	if s.Len() != other.Len() {
+		return false
+	}
+	for key := range s.set {
+		if !other.Contains(key) {
+			return false
+		}
+	}
+	return true
 }
 
 // Copy returns a copy of the current set
@@ -42,7 +49,8 @@ func (s *Set) Copy() *Set {
 // Add adds data to the set
 func (s *Set) Add(data ...interface{}) {
 	for _, data := range data {
-		s.set[data] = true
+		s.set[data] = s.i
+		s.i++
 	}
 }
 
@@ -87,15 +95,37 @@ func (s *Set) Contains(data ...interface{}) bool {
 	return true
 }
 
+type sortSetItem struct {
+	order uint
+	item  interface{}
+}
+
+func (i sortSetItem) Less(o *Sortable) bool {
+	return i.order < (*o).(sortSetItem).order
+}
+
+// SortList returns a new slice containing  the data in the set
+// sorted by order of insertion.
+func (s *Set) SortList() []interface{} {
+	l := NewSortedSlice()
+	for k := range s.set {
+		l.Insert(sortSetItem{s.set[k], k})
+	}
+	out := make([]interface{}, 0, s.Len())
+	slice := l.Slice()
+	for i := len(slice) - 1; i >= 0; i-- {
+		out = append(out, slice[i].(sortSetItem).item)
+	}
+	return out
+}
+
 // List returns a pointer to a new list containing the data in the set
 func (s *Set) List() []interface{} {
-	i := 0
-	l := make([]interface{}, s.Len())
-	for k := range s.set {
-		l[i] = k
-		i++
+	out := make([]interface{}, 0, s.Len())
+	for key := range s.set {
+		out = append(out, key)
 	}
-	return l
+	return out
 }
 
 // Items returns a channel with all the elements contained in the set
@@ -119,19 +149,20 @@ func (s *Set) Len() int {
 // UnmarshalJSON implements json.Unmarshaler interface
 func (s *Set) UnmarshalJSON(data []byte) (err error) {
 	tmp := make([]interface{}, 0)
-	s.set = make(map[interface{}]bool)
+	s.i = 0
+	s.set = make(map[interface{}]uint)
 	if err = json.Unmarshal(data, &tmp); err != nil {
 		return err
 	}
 	for _, data := range tmp {
-		s.set[data] = true
+		s.Add(data)
 	}
 	return
 }
 
 // MarshalJSON implements json.Marshaler interface
 func (s *Set) MarshalJSON() (data []byte, err error) {
-	return json.Marshal(s.List())
+	return json.Marshal(s.SortList())
 }
 
 // SyncedSet datastruct that represent a thread safe set

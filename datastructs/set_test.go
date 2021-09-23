@@ -66,3 +66,27 @@ func TestSetJSON(t *testing.T) {
 		t.Error("Set does not contain expected data")
 	}
 }
+
+func TestJSONMarshalStability(t *testing.T) {
+	// aims at testing that order of elements in serialization is stable
+	var data, prev []byte
+	var err error
+
+	s1 := NewSyncedSet()
+	s1.Add("This", "is", "bar", "!!!", "!!!!!!!")
+
+	for i := 0; i < 100; i++ {
+		if data, err = json.Marshal(&s1); err != nil {
+			t.Error("Failed to marshal JSON")
+		}
+		if prev == nil {
+			goto copy
+		}
+		if string(data) != string(prev) {
+			t.Error("JSON serialization is not stable")
+		}
+	copy:
+		prev = make([]byte, len(data))
+		copy(prev, data)
+	}
+}
