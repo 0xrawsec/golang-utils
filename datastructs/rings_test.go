@@ -139,3 +139,16 @@ func TestRingSet(t *testing.T) {
 		t.Errorf("RingSlice and Set must have the same size, even after json un/marshalling")
 	}
 }
+
+func TestRingSetNestedJSON(t *testing.T) {
+	type T struct {
+		R *RingSet `json:"r"`
+	}
+
+	ts := T{NewRingSet(10)}
+	data, err := json.Marshal(&ts)
+	if err != nil {
+		t.Errorf("Failed to marshal nested structure: %s", err)
+	}
+	t.Log(string(data))
+}
