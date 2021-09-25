@@ -37,30 +37,24 @@ func (s *SyncedMap) Get(key interface{}) (value interface{}, ok bool) {
 	return
 }
 
-func (s *SyncedMap) Keys() chan interface{} {
-	ci := make(chan interface{})
-	go func() {
-		defer close(ci)
-		s.RLock()
-		defer s.RUnlock()
-		for k := range s.m {
-			ci <- k
-		}
-	}()
-	return ci
+func (s *SyncedMap) Keys() (keys []interface{}) {
+	s.RLock()
+	defer s.RUnlock()
+	keys = make([]interface{}, 0, len(s.m))
+	for k := range s.m {
+		keys = append(keys, k)
+	}
+	return
 }
 
-func (s *SyncedMap) Values() chan interface{} {
-	ci := make(chan interface{})
-	go func() {
-		defer close(ci)
-		s.RLock()
-		defer s.RUnlock()
-		for _, v := range s.m {
-			ci <- v
-		}
-	}()
-	return ci
+func (s *SyncedMap) Values() (values []interface{}) {
+	s.RLock()
+	defer s.RUnlock()
+	values = make([]interface{}, 0, len(s.m))
+	for _, v := range s.m {
+		values = append(values, v)
+	}
+	return
 }
 
 func (s *SyncedMap) Len() int {

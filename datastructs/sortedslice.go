@@ -7,7 +7,7 @@ import (
 
 // Sortable interface definition
 type Sortable interface {
-	Less(*Sortable) bool
+	Less(Sortable) bool
 }
 
 // SortedSlice structure
@@ -30,7 +30,7 @@ func NewSortedSlice(opts ...int) *SortedSlice {
 }
 
 // Recursive function to search for the next index less than Sortable
-func (ss *SortedSlice) searchLessThan(e *Sortable, i, j int) int {
+func (ss *SortedSlice) searchLessThan(e Sortable, i, j int) int {
 	pivot := ((j + 1 - i) / 2) + i
 	if j-i == 1 {
 		if ss.s[i].Less(e) {
@@ -46,7 +46,7 @@ func (ss *SortedSlice) searchLessThan(e *Sortable, i, j int) int {
 
 // RangeLessThan returns the indexes of the objects Less than Sortable
 func (ss *SortedSlice) RangeLessThan(e Sortable) (int, int) {
-	i := ss.searchLessThan(&e, 0, len(ss.s)-1)
+	i := ss.searchLessThan(e, 0, len(ss.s)-1)
 	return i, len(ss.s) - 1
 }
 
@@ -54,15 +54,15 @@ func (ss *SortedSlice) RangeLessThan(e Sortable) (int, int) {
 func (ss *SortedSlice) Insert(e Sortable) {
 	switch {
 	// Particular cases
-	case len(ss.s) == 0, !ss.s[len(ss.s)-1].Less(&e):
+	case len(ss.s) == 0, !ss.s[len(ss.s)-1].Less(e):
 		ss.s = append(ss.s, e)
-	case len(ss.s) == 1 && ss.s[0].Less(&e):
+	case len(ss.s) == 1 && ss.s[0].Less(e):
 		ss.s = append(ss.s, e)
 		ss.s[1] = ss.s[0]
 		ss.s[0] = e
 	default:
 		//log.Printf("want to insert v=%v into %v", e, ss.s)
-		i := ss.searchLessThan(&e, 0, len(ss.s)-1)
+		i := ss.searchLessThan(e, 0, len(ss.s)-1)
 		//log.Printf("insert v=%v @ i=%d in ss=%v", e, i, ss.s)
 		// Avoid creating intermediary slices
 		ss.s = append(ss.s, e)
@@ -132,7 +132,7 @@ func (ss *SortedSlice) Slice() []Sortable {
 func (ss *SortedSlice) Control() bool {
 	v := ss.s[0]
 	for _, tv := range ss.s {
-		if !reflect.DeepEqual(v, tv) && !tv.Less(&v) {
+		if !reflect.DeepEqual(v, tv) && !tv.Less(v) {
 			return false
 		}
 	}

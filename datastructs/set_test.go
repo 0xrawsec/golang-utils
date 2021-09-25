@@ -15,10 +15,10 @@ func TestSets(t *testing.T) {
 	intersection := s1.Intersect(s2)
 	union := s1.Union(s2)
 
-	t.Logf("s1.List: %v", s1.List())
-	t.Logf("s2.List: %v", s2.List())
-	t.Logf("s1.Intersect(s2).List: %v", intersection.List())
-	t.Logf("s1.Union(s2).List: %v", union.List())
+	t.Logf("s1.Slice: %v", s1.Slice())
+	t.Logf("s2.Slice: %v", s2.Slice())
+	t.Logf("s1.Intersect(s2).Slice: %v", intersection.Slice())
+	t.Logf("s1.Union(s2).Slice: %v", union.Slice())
 
 	if !s1.Contains("This", "is", "foo") {
 		t.Error("string missing")
@@ -33,10 +33,14 @@ func TestSets(t *testing.T) {
 	if union.Contains("This") || union.Contains("is") || union.Contains("foo") {
 		t.Error("string should be missing")
 	}
-	t.Logf("union after delete: %v", union.List())
+	t.Logf("union after delete: %v", union.Slice())
 
 	if !s1.Equal(s1copy) {
 		t.Error("equality test failed")
+	}
+
+	if s1.Len() != s1copy.Len() {
+		t.Error("length is not equal between original and copy")
 	}
 
 	for it := range union.Items() {

@@ -8,16 +8,16 @@ import (
 
 type MyInt int
 
-func (m MyInt) Less(other *Sortable) bool {
-	return m < (*other).(MyInt)
+func (m MyInt) Less(other Sortable) bool {
+	return m < other.(MyInt)
 }
 
 type MyTime struct {
 	t time.Time
 }
 
-func (m MyTime) Less(other *Sortable) bool {
-	return m.t.Before((*other).(MyTime).t)
+func (m MyTime) Less(other Sortable) bool {
+	return m.t.Before(other.(MyTime).t)
 }
 
 func (m MyTime) String() string {

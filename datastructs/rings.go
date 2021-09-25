@@ -45,15 +45,12 @@ func (r *RingSet) GetItem(i int) interface{} {
 }
 
 func (r *RingSet) SetItem(i int, item interface{}) {
-	if r.rslice.full {
-		r.set.Del(r.GetItem(i))
-	}
-	r.set.Add(item)
 	r.rslice.SetItem(i, item)
+	r.set.Add(item)
 }
 
-func (r *RingSet) List() []interface{} {
-	return r.rslice.List()
+func (r *RingSet) Slice() []interface{} {
+	return r.rslice.Slice()
 }
 
 func (r *RingSet) Copy() *RingSet {
@@ -75,7 +72,7 @@ func (r *RingSet) UnmarshalJSON(data []byte) (err error) {
 	if err = json.Unmarshal(data, &r.rslice); err != nil {
 		return
 	}
-	r.set = NewInitSet(r.rslice.List()...)
+	r.set = NewInitSet(r.rslice.Slice()...)
 	return
 }
 
@@ -130,7 +127,7 @@ func (r *RingSlice) SetItem(i int, item interface{}) {
 	r.ring[i] = item
 }
 
-func (r *RingSlice) List() []interface{} {
+func (r *RingSlice) Slice() []interface{} {
 	l := make([]interface{}, len(r.ring))
 	copy(l, r.ring)
 	return l

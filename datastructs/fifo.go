@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-
-	"github.com/0xrawsec/golang-utils/log"
 )
 
 type Element struct {
@@ -45,7 +43,6 @@ func (f *Fifo) String() string {
 	defer f.RUnlock()
 	out := make([]string, 0)
 	for e := f.e; e != nil; e = e.Next {
-		log.Info(e)
 		out = append(out, e.String())
 	}
 	return strings.Join(out, "->")

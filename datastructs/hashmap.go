@@ -36,8 +36,8 @@ func (hm *HashMap) Get(h Hashable) (interface{}, bool) {
 	return nil, false
 }
 
-// Set sets key, value in the map
-func (hm *HashMap) Set(key Hashable, value interface{}) {
+// Add sets key, value in the map
+func (hm *HashMap) Add(key Hashable, value interface{}) {
 	(*hm).keys[key.Hash()] = key
 	(*hm).values[key.Hash()] = value
 }
@@ -74,6 +74,7 @@ func (hm *HashMap) Values() (ci chan interface{}) {
 
 // Items returns a channel of Item contained in the HashMap
 func (hm *HashMap) Items() (ci chan Item) {
+	ci = make(chan Item)
 	go func() {
 		defer close(ci)
 		for k := range hm.keys {
@@ -92,14 +93,12 @@ func (hm *HashMap) Len() int {
 // SyncedHashMap is a thread safe HashMap
 type SyncedHashMap struct {
 	sync.RWMutex
-	HashMap
+	m *HashMap
 }
 
 // NewSyncedHashMap SyncedHashMap constructor
 func NewSyncedHashMap() (hm *SyncedHashMap) {
-	hm = &SyncedHashMap{}
-	hm.keys = make(map[string]Hashable)
-	hm.values = make(map[string]interface{})
+	hm = &SyncedHashMap{m: NewHashMap()}
 	return hm
 }
 
@@ -107,84 +106,54 @@ func NewSyncedHashMap() (hm *SyncedHashMap) {
 func (hm *SyncedHashMap) Contains(key Hashable) bool {
 	hm.RLock()
 	defer hm.RUnlock()
-	if _, ok := (*hm).keys[key.Hash()]; ok {
-		return ok
-	}
-	return false
+	return hm.m.Contains(key)
 }
 
 // Get the element referenced by key in the HashMap
 func (hm *SyncedHashMap) Get(key Hashable) (interface{}, bool) {
 	hm.RLock()
 	defer hm.RUnlock()
-	if _, ok := (*hm).keys[key.Hash()]; ok {
-		v, ok := (*hm).values[key.Hash()]
-		return v, ok
-	}
-	return nil, false
+	return hm.m.Get(key)
 }
 
-// Set sets key, value in the map
-func (hm *SyncedHashMap) Set(key Hashable, value interface{}) {
+// Add sets key, value in the map
+func (hm *SyncedHashMap) Add(key Hashable, value interface{}) {
 	hm.Lock()
 	defer hm.Unlock()
-	(*hm).keys[key.Hash()] = key
-	(*hm).values[key.Hash()] = value
+	hm.m.Add(key, value)
 }
 
 // Del deletes the key and its associated value
 func (hm *SyncedHashMap) Del(key Hashable) {
 	hm.Lock()
 	defer hm.Unlock()
-	delete((*hm).keys, key.Hash())
-	delete((*hm).values, key.Hash())
+	hm.m.Del(key)
 }
 
 // Keys returns a channel of Keys used by the HashMap
 func (hm *SyncedHashMap) Keys() (ch chan Hashable) {
-	ch = make(chan Hashable)
-	go func() {
-		hm.RLock()
-		defer hm.RUnlock()
-		defer close(ch)
-		for _, v := range hm.keys {
-			ch <- v
-		}
-	}()
-	return
+	hm.RLock()
+	defer hm.RUnlock()
+	return hm.m.Keys()
 }
 
 // Values returns a channel of Values contained in the HashMap
 func (hm *SyncedHashMap) Values() (ci chan interface{}) {
-	ci = make(chan interface{})
-	go func() {
-		hm.RLock()
-		defer hm.RUnlock()
-		defer close(ci)
-		for _, v := range hm.values {
-			ci <- v
-		}
-	}()
-	return
+	hm.RLock()
+	defer hm.RUnlock()
+	return hm.m.Values()
 }
 
 // Items returns a channel of Item contained in the HashMap
 func (hm *SyncedHashMap) Items() (ci chan Item) {
-	go func() {
-		hm.RLock()
-		defer hm.RUnlock()
-		defer close(ci)
-		for k := range hm.keys {
-			i := Item{(*hm).keys[k], (*hm).values[k]}
-			ci <- i
-		}
-	}()
-	return
+	hm.RLock()
+	defer hm.RUnlock()
+	return hm.m.Items()
 }
 
 // Len returns the length of the HashMap
 func (hm *SyncedHashMap) Len() int {
 	hm.RLock()
 	defer hm.RUnlock()
-	return len(hm.keys)
+	return hm.m.Len()
 }

@@ -18,6 +18,7 @@ func TestFifoBasic(t *testing.T) {
 		t.Logf("Size: %d", f.Len())
 	}
 
+	t.Logf("Fifo: %s", f)
 	for p := f.Pop(); p != nil; p = f.Pop() {
 		t.Logf("popped: %s", p)
 		t.Logf("Size: %d", f.Len())

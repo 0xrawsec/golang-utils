@@ -2,6 +2,7 @@ package datastructs
 
 import (
 	"encoding/json"
+	"math/rand"
 	"testing"
 )
 
@@ -107,6 +108,10 @@ func TestRingSet(t *testing.T) {
 		t.Errorf("RingSlice and Set must have the same size")
 	}
 
+	if r.set.Len() != r.Len() {
+		t.Errorf("Inconsistent size")
+	}
+
 	b, err := json.Marshal(&r)
 	if err != nil {
 		t.Errorf("Failed to marshal RingSet: %s", err)
@@ -151,4 +156,35 @@ func TestRingSetNestedJSON(t *testing.T) {
 		t.Errorf("Failed to marshal nested structure: %s", err)
 	}
 	t.Log(string(data))
+}
+
+func TestRingGetSet(t *testing.T) {
+	size := 100
+	r := NewRingSet(100)
+	for i := 0; i < r.Len(); i++ {
+		r.SetItem(i, rand.Int())
+	}
+
+	s := r.Slice()
+	for i := 0; i < size; i++ {
+		item := r.GetItem(i)
+		if item.(int) != s[i].(int) {
+			t.Error("Wrong value returned by GetItem")
+		}
+	}
+}
+
+func TestRingSetCopy(t *testing.T) {
+	size := 100
+	r := NewRingSet(100)
+	for i := 0; i < r.Len(); i++ {
+		r.SetItem(i, rand.Int())
+	}
+
+	copy := r.Copy()
+	for i := 0; i < size; i++ {
+		if r.GetItem(i).(int) != copy.GetItem(i).(int) {
+			t.Error("Wrong value returned by GetItem")
+		}
+	}
 }

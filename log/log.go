@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"strings"
 )
 
 const (
@@ -20,9 +21,10 @@ const (
 )
 
 var (
-	//gLogFile        *os.File
 	gLogLevel       = LInfo
 	gLogLevelBackup = gLogLevel
+
+	MockAbort = false
 )
 
 func init() {
@@ -79,7 +81,7 @@ func RestoreLogLevel() {
 }
 
 func logMessage(prefix string, i ...interface{}) {
-	format := fmt.Sprintf("%s%%%dv", prefix, len(i))
+	format := fmt.Sprintf("%s%s", prefix, strings.Repeat("%v ", len(i)))
 	msg := fmt.Sprintf(format, i...)
 	log.Output(3, msg)
 }
@@ -101,14 +103,14 @@ func Infof(format string, i ...interface{}) {
 // Warning log message if gLogLevel <= LInfo
 func Warn(i ...interface{}) {
 	if gLogLevel <= LInfo {
-		logMessage("Warning - ", i...)
+		logMessage("WARNING - ", i...)
 	}
 }
 
 // Warnf log message with format if gLogLevel <= LInfo
 func Warnf(format string, i ...interface{}) {
 	if gLogLevel <= LInfo {
-		logMessage("Warning - ", fmt.Sprintf(format, i...))
+		logMessage("WARNING - ", fmt.Sprintf(format, i...))
 	}
 }
 
@@ -140,23 +142,14 @@ func Errorf(format string, i ...interface{}) {
 	}
 }
 
-// LogError logs an error
-func LogError(err error) {
+// Abort logs an error and exit with return code
+func Abort(rc int, i ...interface{}) {
 	if gLogLevel <= LError {
-		logMessage("ERROR - ", err.Error())
+		logMessage("ABORT - ", i...)
 	}
-}
-
-// LogErrorAndExit logs an error and exit with an optional return code
-func LogErrorAndExit(err error, opts ...int) {
-	var rc int
-	if len(opts) > 0 {
-		rc = opts[0]
+	if !MockAbort {
+		os.Exit(rc)
 	}
-	if gLogLevel <= LError {
-		logMessage("ERROR - ", err.Error())
-	}
-	os.Exit(rc)
 }
 
 // Critical log message if gLogLevel <= LCritical

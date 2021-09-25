@@ -15,7 +15,7 @@ type Set struct {
 func NewSet(sets ...*Set) *Set {
 	s := &Set{0, make(map[interface{}]uint)}
 	for _, set := range sets {
-		pDatas := set.List()
+		pDatas := set.Slice()
 		s.Add(pDatas...)
 	}
 	return s
@@ -100,13 +100,13 @@ type sortSetItem struct {
 	item  interface{}
 }
 
-func (i sortSetItem) Less(o *Sortable) bool {
-	return i.order < (*o).(sortSetItem).order
+func (i sortSetItem) Less(o Sortable) bool {
+	return i.order < o.(sortSetItem).order
 }
 
-// SortList returns a new slice containing  the data in the set
+// SortSlice returns a new slice containing  the data in the set
 // sorted by order of insertion.
-func (s *Set) SortList() []interface{} {
+func (s *Set) SortSlice() []interface{} {
 	l := NewSortedSlice()
 	for k := range s.set {
 		l.Insert(sortSetItem{s.set[k], k})
@@ -119,8 +119,8 @@ func (s *Set) SortList() []interface{} {
 	return out
 }
 
-// List returns a pointer to a new list containing the data in the set
-func (s *Set) List() []interface{} {
+// Slice returns a pointer to a new slice containing the data in the set
+func (s *Set) Slice() []interface{} {
 	out := make([]interface{}, 0, s.Len())
 	for key := range s.set {
 		out = append(out, key)
@@ -162,7 +162,7 @@ func (s *Set) UnmarshalJSON(data []byte) (err error) {
 
 // MarshalJSON implements json.Marshaler interface
 func (s *Set) MarshalJSON() (data []byte, err error) {
-	return json.Marshal(s.SortList())
+	return json.Marshal(s.SortSlice())
 }
 
 // SyncedSet datastruct that represent a thread safe set
@@ -176,7 +176,7 @@ func NewSyncedSet(sets ...*SyncedSet) *SyncedSet {
 	ss := &SyncedSet{}
 	ss.set = NewSet()
 	for _, set := range sets {
-		ss.Add(set.List()...)
+		ss.Add(set.Slice()...)
 	}
 	return ss
 }
@@ -216,7 +216,7 @@ func (s *SyncedSet) Del(data ...interface{}) {
 func (s *SyncedSet) Intersect(other *SyncedSet) *SyncedSet {
 	s.RLock()
 	defer s.RUnlock()
-	newSet := NewInitSyncedSet(s.set.Intersect(other.set).List()...)
+	newSet := NewInitSyncedSet(s.set.Intersect(other.set).Slice()...)
 	return newSet
 }
 
@@ -224,7 +224,7 @@ func (s *SyncedSet) Intersect(other *SyncedSet) *SyncedSet {
 func (s *SyncedSet) Union(other *SyncedSet) *SyncedSet {
 	s.RLock()
 	defer s.RUnlock()
-	newSet := NewInitSyncedSet(s.set.Union(other.set).List()...)
+	newSet := NewInitSyncedSet(s.set.Union(other.set).Slice()...)
 	return newSet
 }
 
@@ -235,11 +235,11 @@ func (s *SyncedSet) Contains(data ...interface{}) bool {
 	return s.set.Contains(data...)
 }
 
-// List returns a pointer to a new list containing the data in the set
-func (s *SyncedSet) List() []interface{} {
+// Slice returns a pointer to a new slice containing the data in the set
+func (s *SyncedSet) Slice() []interface{} {
 	s.RLock()
 	defer s.RUnlock()
-	return s.set.List()
+	return s.set.Slice()
 }
 
 // Items returns a channel with all the elements contained in the set
