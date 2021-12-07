@@ -29,14 +29,28 @@ func joinFold(ss []string, sep string, foldWidth int) string {
 func repr(i interface{}) string {
 	v := reflect.ValueOf(i)
 	switch v.Kind() {
+	case reflect.Ptr:
+		if v.IsZero() {
+			return "nil"
+		}
+		return repr(v.Elem().Interface())
 	case reflect.Struct:
+		t := v.Type()
 		structStr := make([]string, 0, v.NumField())
 		for i := 0; i < v.NumField(); i++ {
-			structStr = append(structStr, repr(v.Field(i).Interface()))
+			fieldName := t.Field(i).Name
+			if string(fieldName[0]) == strings.ToUpper(string(fieldName[0])) {
+				structStr = append(structStr, repr(v.Field(i).Interface()))
+			}
 		}
 		return fmt.Sprintf("%T{%s}", v.Interface(), strings.Join(structStr, ","))
 	case reflect.String:
-		return fmt.Sprintf("\"%s\"", v)
+		s := fmt.Sprintf("%s", v)
+		if strings.Contains(s, `"`) {
+			s = strings.Replace(s, "`", "'", -1)
+			return fmt.Sprintf("`%s`", s)
+		}
+		return fmt.Sprintf("\"%s\"", s)
 	case reflect.Slice:
 		elements := make([]string, 0, v.Len())
 		for i := 0; i < v.Len(); i++ {

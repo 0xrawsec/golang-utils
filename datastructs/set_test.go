@@ -71,6 +71,21 @@ func TestSetJSON(t *testing.T) {
 	}
 }
 
+func TestSetOrder(t *testing.T) {
+	size := 10000
+	s := NewSet()
+	for i := 0; i < size; i++ {
+		s.Add(i)
+	}
+
+	ss := s.SortSlice()
+	for i := 0; i < size; i++ {
+		if ss[i].(int) != i {
+			t.Error("Bad set order")
+		}
+	}
+}
+
 func TestJSONMarshalStability(t *testing.T) {
 	// aims at testing that order of elements in serialization is stable
 	var data, prev []byte
