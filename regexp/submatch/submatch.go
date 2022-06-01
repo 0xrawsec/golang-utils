@@ -19,10 +19,10 @@ type Helper struct {
 }
 
 var (
-	ErrNoSuchKey                 = errors.New("No such key")
-	ErrIndexOutOfRange           = errors.New("Index out of range")
-	ErrUnparsableDestinationType = errors.New("Unknown destination type")
-	ErrNotValidPtr               = errors.New("Not valid pointer")
+	ErrNoSuchKey                 = errors.New("no such key")
+	ErrIndexOutOfRange           = errors.New("index out of range")
+	ErrUnparsableDestinationType = errors.New("unknown destination type")
+	ErrNotValidPtr               = errors.New("not valid pointer")
 	TimeType                     = reflect.ValueOf(time.Time{}).Type()
 )
 
@@ -118,6 +118,11 @@ func (sh *Helper) Unmarshal(v interface{}) error {
 	t := s.Type()
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
+
+		if !field.IsExported() {
+			continue
+		}
+
 		// Unmarshal recursively if field of struct is a struct
 		if s.Field(i).Kind() == reflect.Struct && s.Field(i).Type().Name() != TimeType.Name() {
 			if err := sh.Unmarshal(s.Field(i).Addr().Interface()); err != nil {
